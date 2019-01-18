@@ -5,7 +5,10 @@ __pycache__/
 
 # C extensions
 *.so
-
+data/char2vec_300
+data/data.pkl
+data/vocab.pkl
+logdir/*
 # Distribution / packaging
 .Python
 build/

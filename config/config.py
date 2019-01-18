@@ -7,13 +7,13 @@
 import os
 
 PATH = os.getcwd()
-TRAIN_DATA = os.path.join(PATH, 'data/train.char.bmes')
-DEV_DATA = os.path.join(PATH, 'data/dev.char.bmes')
-TEST_DATA = os.path.join(PATH, 'data/test.char.bmes')
+ATEC_NLP_DATA = os.path.join(PATH, 'data/atec_nlp_sim_train.csv')
+ADD_ATEC_NLP_DATA = os.path.join(PATH, 'data/atec_nlp_sim_train_add.csv')
 
-TOKEN_DATA = os.path.join(PATH, 'data/vocab/token.json')
-TAG_DATA = os.path.join(PATH, 'data/vocab/tag.json')
-TOKEN_FRE_DATA = os.path.join(PATH, 'data/token_fre.data')
-TAG_FRE_DATA = os.path.join(PATH, 'data/tag_fre.data')
+DATA_PKL = os.path.join(PATH, 'data/data.pkl')
+VOCAB_PKL = os.path.join(PATH, 'data/vocab.pkl')
 
+WORD2VEC_DATA = os.path.join(PATH, 'data/char2vec_300')
 logdir = os.path.join(PATH, 'logdir')
+checkpoint_dir = os.path.join(logdir, "checkpoints")
+model_dir = os.path.join(logdir, "model")

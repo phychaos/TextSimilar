@@ -10,21 +10,24 @@ from model.module.rnn import ForgetLSTMCell, IndRNNCell
 
 
 class SiameseNetwork(object):
-	def __init__(self, vocab_size, num_tags, is_training=True, seg='rnn'):
+	def __init__(self, vocab_size, embedding_size, max_len, batch_size, is_training=True, seg='LSTM'):
 		self.vocab_size = vocab_size
-		self.num_tags = num_tags
+		self.embedding_size = embedding_size
+		self.max_len = max_len
 		self.is_training = is_training
 		self.graph = tf.Graph()
 		with self.graph.as_default():
-			self.key = tf.placeholder(tf.int32, shape=(None, hp.max_len), name="key")
-			self.value = tf.placeholder(tf.int32, shape=(None, hp.max_len), name="value")
-			self.y = tf.placeholder(tf.int32, shape=(None,), name="target")
-			self.key_seq_lens = tf.placeholder(dtype=tf.int32, shape=[None])
-			self.value_seq_lens = tf.placeholder(dtype=tf.int32, shape=[None])
+			self.left_x = tf.placeholder(tf.int32, shape=(batch_size, max_len), name="left_x")
+			self.right_x = tf.placeholder(tf.int32, shape=(batch_size, max_len), name="right_x")
+			self.y = tf.placeholder(tf.int32, shape=(batch_size,), name="target")
+			self.left_seq_lens = tf.placeholder(dtype=tf.int32, shape=[batch_size])
+			self.right_seq_lens = tf.placeholder(dtype=tf.int32, shape=[batch_size])
 			self.global_step = tf.train.create_global_step()
 			
 			key, value = self.siamese(seg)
-			self.loss = self.loss_layer(key, value)
+			self.distance, self.pre_y = self.similar(key, value)
+			self.accuracy = self.predict()
+			self.loss = self.loss_layer()
 			self.train_op = self.optimize()
 	
 	def siamese(self, seg):
@@ -33,21 +36,21 @@ class SiameseNetwork(object):
 		:param seg:
 		:return:
 		"""
-		key_value = tf.concat(self.key, self.value, axis=0)
-		seq_lens = tf.concat(self.key_seq_lens, self.value_seq_lens)
+		x = tf.concat([self.left_x, self.right_x], axis=0)
+		seq_lens = tf.concat([self.left_seq_lens, self.right_seq_lens], axis=0)
 		# layers embedding multi_head_attention rnn
-		embed = embedding(key_value, vocab_size=self.vocab_size, num_units=hp.num_units, scale=True, scope="embed")
+		embed = embedding(x, vocab_size=self.vocab_size, num_units=hp.num_units, scale=True, scope="embed")
 		
-		output = self.transformer(embed, key_value)
-		output = self.rnn_layer(output, seq_lens, seg)
+		# output = self.transformer(embed, x)
+		output = self.rnn_layer(embed, seq_lens, seg)
 		output = self.attention(embed, output)
-		key, value = tf.split(0, 2, output)
+		key, value = tf.split(output, 2, axis=0)
 		return key, value
 	
-	def rnn_layer(self, embed, seq_lens, seg):
+	def rnn_layer(self, inputs, seq_lens, seg):
 		"""
 		创建双向RNN层
-		:param embed:
+		:param inputs:
 		:param seq_lens:
 		:param seg: LSTM GRU F-LSTM, IndRNN
 		:return:
@@ -70,8 +73,7 @@ class SiameseNetwork(object):
 			bw_cell = tf.nn.rnn_cell.BasicRNNCell(num_units=hp.num_units)
 		# 双向rnn
 		(fw_output, bw_output), _ = tf.nn.bidirectional_dynamic_rnn(
-			fw_cell, bw_cell, embed, sequence_length=seq_lens, dtype=tf.float32)
-		
+			fw_cell, bw_cell, inputs, sequence_length=seq_lens, dtype=tf.float32)
 		# 合并双向rnn的output batch_size * max_seq * (hidden_dim*2)
 		output = tf.add(fw_output, bw_output)
 		return output
@@ -102,19 +104,17 @@ class SiameseNetwork(object):
 				query = feedforward(query, num_units=[4 * hp.num_units, hp.num_units])
 		return query
 	
-	def loss_layer(self, key, value):
+	def loss_layer(self):
 		"""
 		损失函数 L+ = （1-Ew)^2/4  L_ = max(Ex,0)^2
-		:param key:
-		:param value:
 		:return:
 		"""
+		y = tf.cast(self.y, tf.float32)
 		with tf.name_scope("output"):
-			distance = self.similar(key, value)
-			loss_p = tf.square(1 - distance) / 4
-			mask = tf.sign(distance - hp.margin)
-			loss_m = tf.square(mask * distance)
-			loss = tf.reduce_sum(self.y * loss_p, (1 - self.y) * loss_m)
+			loss_p = tf.square(1 - self.distance) / 4
+			mask = tf.sign(self.distance - hp.margin)
+			loss_m = tf.square(mask * self.distance)
+			loss = tf.reduce_sum(y * loss_p + (1 - y) * loss_m)
 			return loss
 	
 	def attention(self, embed, query):
@@ -128,12 +128,13 @@ class SiameseNetwork(object):
 			w = tf.get_variable(name="attention_w", shape=[2 * hp.num_units, hp.attention_size], dtype=tf.float32)
 			b = tf.get_variable(name="attention_b", shape=[hp.attention_size], dtype=tf.float32)
 			u = tf.get_variable(name="attention_u", shape=[hp.attention_size, 1], dtype=tf.float32)
-			query = tf.concat(embed, query, axis=-1)
-			query = tf.reshape(query, [-1, 2 * hp.num_units])
-			attention = tf.matmul(tf.tanh(tf.matmul(query, w) + b), u)
-			attention = tf.reshape(attention, shape=[-1, hp.max_len])
+			value = tf.concat([embed, query], axis=-1)
+			value = tf.reshape(value, [-1, 2 * hp.num_units])
+			attention = tf.matmul(tf.tanh(tf.matmul(value, w) + b), u)
+			attention = tf.reshape(attention, shape=[-1, self.max_len])
 			attention = tf.nn.softmax(attention, axis=-1)
 			attention = tf.tile(tf.expand_dims(attention, axis=-1), multiples=[1, 1, hp.num_units])
+			
 			output = tf.reduce_sum(attention * query, axis=1)
 			output = layer_normalize(output)
 			return output
@@ -141,17 +142,23 @@ class SiameseNetwork(object):
 	@staticmethod
 	def similar(key, value):
 		"""
-		激活函数 v = s/|s| * s^2/(1+s^2) < 1
+		cosine(key,value) = key * value/(|key|*|value|)
 		:param key:
 		:param value:
 		:return:
 		"""
 		dot_value = tf.reduce_sum(key * value, axis=-1)
-		key_sqrt = tf.sqrt(tf.reduce_sum(tf.square(key)), axis=-1)
-		value_sqrt = tf.sqrt(tf.reduce_sum(tf.square(value)), axis=-1)
-		distance = tf.div(dot_value, key_sqrt * value_sqrt)
-		
-		return distance
+		key_sqrt = tf.sqrt(tf.reduce_sum(tf.square(key), axis=-1))
+		value_sqrt = tf.sqrt(tf.reduce_sum(tf.square(value), axis=-1))
+		distance = tf.div(dot_value, key_sqrt * value_sqrt, name="similar")
+		pre_y = tf.sign(tf.nn.relu(distance - hp.margin), )
+		pre_y = tf.cast(pre_y, tf.int32, name='pre')
+		return distance, pre_y
+	
+	def predict(self):
+		correct_predictions = tf.equal(self.pre_y, self.y)
+		accuracy = tf.reduce_mean(tf.cast(correct_predictions, "float"), name="accuracy")
+		return accuracy
 	
 	def optimize(self):
 		"""
