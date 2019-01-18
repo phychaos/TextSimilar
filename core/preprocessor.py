@@ -6,7 +6,7 @@
 from sklearn.model_selection import train_test_split
 import numpy as np
 from config.config import DATA_PKL, VOCAB_PKL, ATEC_NLP_DATA, ADD_ATEC_NLP_DATA
-from core.utils import save_data, read_csv
+from core.utils import save_data, read_csv, load_data
 from core.word_embedding import Vocab
 import re
 
@@ -58,9 +58,7 @@ def preprocessor():
 	data = read_csv(ATEC_NLP_DATA)
 	data.extend(read_csv(ADD_ATEC_NLP_DATA))
 	idx, left_x, right_x, y = zip(*data)
-	left_max_len = max([len(x) for x in left_x])
-	right_max_len = max([len(x) for x in right_x])
-	max_len = max(left_max_len, right_max_len)
+	max_len = max([len(x) for x in left_x + right_x])
 	y = process_label(y)
 	vocab = build_vocab(left_x + right_x)
 	
@@ -105,3 +103,6 @@ def pad_sequence(data, vocab, max_len):
 		sentence = [vocab.word2idx.get(kk, UNK2ID) for kk in sentence] + [PAD2ID] * (max_len - seq_len)
 		seqs_data.append(sentence[:max_len])
 	return seqs_data, seqs_len
+
+
+

@@ -10,6 +10,9 @@ PATH = os.getcwd()
 ATEC_NLP_DATA = os.path.join(PATH, 'data/atec_nlp_sim_train.csv')
 ADD_ATEC_NLP_DATA = os.path.join(PATH, 'data/atec_nlp_sim_train_add.csv')
 
+TEST_DATA = os.path.join(PATH, 'data/atec_nlp_sim_test.csv')
+TEST_RESULT = os.path.join(PATH, 'data/test_result.csv')
+
 DATA_PKL = os.path.join(PATH, 'data/data.pkl')
 VOCAB_PKL = os.path.join(PATH, 'data/vocab.pkl')
 

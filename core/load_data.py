@@ -4,8 +4,8 @@
 # @Author  : 林利芳
 # @File    : load_data.py
 from config.config import DATA_PKL, VOCAB_PKL
-from core.preprocessor import preprocessor
-from core.utils import load_data
+from core.preprocessor import preprocessor, pad_sequence
+from core.utils import load_data, read_csv
 import numpy as np
 
 
@@ -34,14 +34,16 @@ def gen_batch_data(l_x, r_x, l_len, r_len, y, batch_size, is_training=True):
 	
 	for ii in range(num_batch):
 		start, end = ii * batch_size, (ii + 1) * batch_size
-		if end > len(y):
+		start_batch = 0
+		if end > data_size:
+			start_batch = end - data_size
 			start, end = data_size - batch_size, data_size
 		l_x_batch = l_x[start:end]
 		r_x_batch = r_x[start:end]
 		l_len_batch = l_len[start:end]
 		r_len_batch = r_len[start:end]
 		y_batch = y[start:end]
-		yield l_x_batch, r_x_batch, l_len_batch, r_len_batch, y_batch
+		yield l_x_batch, r_x_batch, l_len_batch, r_len_batch, y_batch, start_batch
 
 
 def load_train_data(is_preprocessor=False):
@@ -76,7 +78,7 @@ def get_feed_dict(model, l_x, r_x, l_len, r_len, y, batch_size, is_training=True
 	:param is_training:
 	:return:
 	"""
-	for l_x_batch, r_x_batch, l_len_batch, r_len_batch, y_batch in gen_batch_data(
+	for l_x_batch, r_x_batch, l_len_batch, r_len_batch, y_batch, start_batch in gen_batch_data(
 			l_x, r_x, l_len, r_len, y, batch_size, is_training=is_training):
 		feed_dict = {
 			model.left_x: l_x_batch,
@@ -85,7 +87,7 @@ def get_feed_dict(model, l_x, r_x, l_len, r_len, y, batch_size, is_training=True
 			model.left_seq_lens: l_len_batch,
 			model.right_seq_lens: r_len_batch
 		}
-		yield feed_dict
+		yield feed_dict, start_batch
 
 
 def print_info(epoch, step, train_loss, dev_loss, dev_acc):
@@ -95,3 +97,20 @@ def print_info(epoch, step, train_loss, dev_loss, dev_acc):
 	print('**************************************************')
 	print("epoch\t{}\tstep\t{}".format(epoch, step))
 	print("train_loss\t{}\tdev_loss\t{}\tacc\t{}\n\n".format(loss, val_loss, acc))
+
+
+def load_test_data(filename):
+	max_len, vocab = load_vocab_seq_len()
+	data = read_csv(filename)
+	data = [kk[:3] for kk in data]
+	idx, left_x, right_x = zip(*data)
+	left_x, left_len = pad_sequence(left_x, vocab, max_len)
+	right_x, right_len = pad_sequence(right_x, vocab, max_len)
+	
+	return idx, left_x, left_len, right_x, right_len, max_len, vocab
+
+
+def save_test_result(filename, idx, predicts):
+	with open(filename, 'w', encoding='utf-8') as fp:
+		for _id, pre in zip(idx, predicts):
+			fp.writelines('{}\t{}\n'.format(_id, pre))
