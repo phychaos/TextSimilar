@@ -6,7 +6,7 @@
 
 from core.load_data import load_train_data, get_feed_dict, print_info
 from config.config import checkpoint_dir
-from model.rnn_siamese import SiameseNetwork
+from model.siamese_network import SiameseNetwork
 from config.hyperparams import HyperParams as hp
 import tensorflow as tf
 

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Time    : 18-12-29 下午3:07
 # @Author  : 林利芳
-# @File    : rnn_siamese.py
+# @File    : siamese_network.py
 import tensorflow as tf
 from config.hyperparams import HyperParams as hp
 from model.module.modules import embedding, positional_encoding, multihead_attention, feedforward, layer_normalize
