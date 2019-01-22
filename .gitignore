@@ -8,7 +8,8 @@ __pycache__/
 data/char2vec_300
 data/data.pkl
 data/vocab.pkl
-logdir/*
+logdir/checkpoints/*
+logdir/model/*
 # Distribution / packaging
 .Python
 build/
