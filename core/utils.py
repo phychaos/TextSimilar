@@ -17,6 +17,7 @@ def read_csv(filename, delimiter='\t'):
 	"""
 	with open(filename, 'r') as fp:
 		data = [[ii for ii in each] for each in csv.reader(fp, delimiter=delimiter)]
+	print(data[:10])
 	return data
 
 

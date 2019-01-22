@@ -7,7 +7,7 @@ import sys
 
 from core.load_data import get_feed_dict, load_test_data, save_test_result
 from config.config import checkpoint_dir, TEST_DATA, TEST_RESULT
-from model.siamese_network import SiameseNetwork
+from model.rnn_siamese import SiameseNetwork
 from config.hyperparams import HyperParams as hp
 import tensorflow as tf
 import numpy as np

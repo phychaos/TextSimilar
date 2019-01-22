@@ -1,15 +1,14 @@
 #!/usr/bin python3
 # -*- coding: utf-8 -*-
-# @Time    : 18-12-29 下午3:07
+# @Time    : 19-1-22 上午10:48
 # @Author  : 林利芳
-# @File    : siamese_network.py
+# @File    : transformer_siamese.py
 import tensorflow as tf
 from config.hyperparams import HyperParams as hp
 from model.module.modules import embedding, positional_encoding, multihead_attention, feedforward, layer_normalize
-from model.module.rnn import ForgetLSTMCell, IndRNNCell
 
 
-class SiameseNetwork(object):
+class TransformerSiameseNetwork(object):
 	def __init__(self, vocab_size, embedding_size, max_len, batch_size, is_training=True, seg='LSTM'):
 		self.vocab_size = vocab_size
 		self.embedding_size = embedding_size
@@ -62,12 +61,6 @@ class SiameseNetwork(object):
 		elif seg == 'GRU':
 			fw_cell = tf.nn.rnn_cell.GRUCell(num_units=hp.num_units)
 			bw_cell = tf.nn.rnn_cell.GRUCell(num_units=hp.num_units)
-		elif seg == 'F-LSTM':
-			fw_cell = ForgetLSTMCell(num_units=hp.num_units)
-			bw_cell = ForgetLSTMCell(num_units=hp.num_units)
-		elif seg == 'IndRNN':
-			fw_cell = IndRNNCell(num_units=hp.num_units)
-			bw_cell = IndRNNCell(num_units=hp.num_units)
 		else:
 			fw_cell = tf.nn.rnn_cell.BasicRNNCell(num_units=hp.num_units)
 			bw_cell = tf.nn.rnn_cell.BasicRNNCell(num_units=hp.num_units)
@@ -112,7 +105,7 @@ class SiameseNetwork(object):
 		y = tf.cast(self.y, tf.float32)
 		with tf.name_scope("output"):
 			loss_p = tf.square(1 - self.distance) / 4
-			mask = tf.sign(self.distance - hp.margin)
+			mask = tf.sign(tf.nn.relu(self.distance - hp.margin))
 			loss_m = tf.square(mask * self.distance)
 			loss = tf.reduce_sum(y * loss_p + (1 - y) * loss_m)
 			return loss
@@ -148,10 +141,10 @@ class SiameseNetwork(object):
 		:return:
 		"""
 		dot_value = tf.reduce_sum(key * value, axis=-1)
-		key_sqrt = tf.sqrt(tf.reduce_sum(tf.square(key), axis=-1))
-		value_sqrt = tf.sqrt(tf.reduce_sum(tf.square(value), axis=-1))
+		key_sqrt = tf.sqrt(tf.reduce_sum(tf.square(key), axis=-1) + hp.eps)
+		value_sqrt = tf.sqrt(tf.reduce_sum(tf.square(value), axis=-1) + hp.eps)
 		distance = tf.div(dot_value, key_sqrt * value_sqrt, name="similar")
-		pre_y = tf.sign(tf.nn.relu(distance - hp.margin), )
+		pre_y = tf.sign(tf.nn.relu(distance - hp.margin))
 		pre_y = tf.cast(pre_y, tf.int32, name='pre')
 		return distance, pre_y
 	

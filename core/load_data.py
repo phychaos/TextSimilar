@@ -7,6 +7,7 @@ from config.config import DATA_PKL, VOCAB_PKL
 from core.preprocessor import preprocessor, pad_sequence
 from core.utils import load_data, read_csv
 import numpy as np
+from sklearn.metrics import recall_score, precision_score, f1_score
 
 
 def gen_batch_data(l_x, r_x, l_len, r_len, y, batch_size, is_training=True):
@@ -90,13 +91,15 @@ def get_feed_dict(model, l_x, r_x, l_len, r_len, y, batch_size, is_training=True
 		yield feed_dict, start_batch
 
 
-def print_info(epoch, step, train_loss, dev_loss, dev_acc):
+def print_info(epoch, step, train_loss, dev_loss, y, pre_y):
 	loss = round(float(np.mean(train_loss)), 3)
 	val_loss = round(float(np.mean(dev_loss)), 3)
-	acc = round(float(np.mean(dev_acc)), 4)
+	f1 = round(f1_score(y, pre_y), 4)
+	recall = round(recall_score(y, pre_y), 4)
+	precision = round(precision_score(y, pre_y), 4)
 	print('**************************************************')
-	print("epoch\t{}\tstep\t{}".format(epoch, step))
-	print("train_loss\t{}\tdev_loss\t{}\tacc\t{}\n\n".format(loss, val_loss, acc))
+	print("epoch\t{}\tstep\t{}\ttrain_loss\t{}\tdev_loss\t{}\t".format(epoch, step, loss, val_loss))
+	print("precision\t{}\trecall\t{}\tf1\t{}\n\n".format(precision, recall, f1))
 
 
 def load_test_data(filename):
