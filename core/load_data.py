@@ -4,13 +4,13 @@
 # @Author  : 林利芳
 # @File    : load_data.py
 from config.config import DATA_PKL, VOCAB_PKL
-from core.preprocessor import preprocessor, pad_sequence
+from core.preprocessor import preprocessor, pad_sequence, trim
 from core.utils import load_data, read_csv
 import numpy as np
 from sklearn.metrics import recall_score, precision_score, f1_score
 
 
-def gen_batch_data(l_x, r_x, l_len, r_len, y, batch_size, is_training=True):
+def gen_batch_data(l_x, r_x, l_len, r_len, y, batch_size):
 	"""
 	生成batch数据
 	:param l_x:
@@ -19,17 +19,8 @@ def gen_batch_data(l_x, r_x, l_len, r_len, y, batch_size, is_training=True):
 	:param r_len:
 	:param y:
 	:param batch_size:
-	:param is_training:训练集，打乱顺序
 	:return:
 	"""
-	if is_training:
-		np.random.seed(10)
-		shuffle_indices = np.random.permutation(np.arange(len(l_x)))
-		l_x = l_x[shuffle_indices]
-		r_x = r_x[shuffle_indices]
-		l_len = l_len[shuffle_indices]
-		r_len = r_len[shuffle_indices]
-		y = y[shuffle_indices]
 	data_size = len(y)
 	num_batch = data_size // batch_size + 1
 	
@@ -47,26 +38,25 @@ def gen_batch_data(l_x, r_x, l_len, r_len, y, batch_size, is_training=True):
 		yield l_x_batch, r_x_batch, l_len_batch, r_len_batch, y_batch, start_batch
 
 
-def load_train_data(is_preprocessor=False):
-	if is_preprocessor:
-		data, vocab = preprocessor()
-	else:
-		data = load_data(DATA_PKL)
-		vocab = load_data(VOCAB_PKL)
-	train_l_x, val_l_x, train_l_len, val_l_len, train_r_x, val_r_x, train_r_len, val_r_len, train_y, val_y, max_len = \
-		data['train_l_x'], data['val_l_x'], data['train_l_len'], data['val_l_len'], data['train_r_x'], data[
-			'val_r_x'], data['train_r_len'], data['val_r_len'], data['train_y'], data['val_y'], data['max_len']
-	return train_l_x, val_l_x, train_l_len, val_l_len, train_r_x, val_r_x, train_r_len, val_r_len, train_y, val_y, max_len, vocab
-
-
-def load_vocab_seq_len():
+def load_train_data():
 	data = load_data(DATA_PKL)
-	vocab = load_data(VOCAB_PKL)
-	max_len = data['max_len']
-	return max_len, vocab
+	train_l_x, val_l_x, train_l_len, val_l_len, train_r_x, val_r_x, train_r_len, val_r_len, train_y, val_y = \
+		data['train_l_x'], data['val_l_x'], data['train_l_len'], data['val_l_len'], data['train_r_x'], data[
+			'val_r_x'], data['train_r_len'], data['val_r_len'], data['train_y'], data['val_y']
+	train_l_x = np.array(train_l_x)
+	val_l_x = np.array(val_l_x)
+	train_l_len = np.array(train_l_len)
+	val_l_len = np.array(val_l_len)
+	train_r_x = np.array(train_r_x)
+	val_r_x = np.array(val_r_x)
+	train_r_len = np.array(train_r_len)
+	val_r_len = np.array(val_r_len)
+	train_y = np.array(train_y)
+	val_y = np.array(val_y)
+	return train_l_x, val_l_x, train_l_len, val_l_len, train_r_x, val_r_x, train_r_len, val_r_len, train_y, val_y
 
 
-def get_feed_dict(model, l_x, r_x, l_len, r_len, y, batch_size, is_training=True):
+def get_feed_dict(model, l_x, r_x, l_len, r_len, y, batch_size):
 	"""
 	生成feed_dict
 	:param model:
@@ -76,11 +66,10 @@ def get_feed_dict(model, l_x, r_x, l_len, r_len, y, batch_size, is_training=True
 	:param r_len:
 	:param y:
 	:param batch_size:
-	:param is_training:
 	:return:
 	"""
 	for l_x_batch, r_x_batch, l_len_batch, r_len_batch, y_batch, start_batch in gen_batch_data(
-			l_x, r_x, l_len, r_len, y, batch_size, is_training=is_training):
+			l_x, r_x, l_len, r_len, y, batch_size):
 		feed_dict = {
 			model.left_x: l_x_batch,
 			model.right_x: r_x_batch,
@@ -103,17 +92,23 @@ def print_info(epoch, step, train_loss, dev_loss, y, pre_y):
 
 
 def load_test_data(filename):
-	max_len, vocab = load_vocab_seq_len()
+	vocab = load_data(VOCAB_PKL)
+	max_len = vocab.max_len
 	data = read_csv(filename)
 	data = [kk[:3] for kk in data]
 	idx, left_x, right_x = zip(*data)
+	
+	left_x = [trim(kk) for kk in left_x]
+	right_x = [trim(kk) for kk in right_x]
+	
 	left_x, left_len = pad_sequence(left_x, vocab, max_len)
 	right_x, right_len = pad_sequence(right_x, vocab, max_len)
 	
-	return idx, left_x, left_len, right_x, right_len, max_len, vocab
+	return idx, left_x, left_len, right_x, right_len, vocab
 
 
 def save_test_result(filename, idx, predicts):
-	with open(filename, 'w', encoding='utf-8') as fp:
+	import codecs
+	with codecs.open(filename, 'w', encoding='utf-8') as fp:
 		for _id, pre in zip(idx, predicts):
 			fp.writelines('{}\t{}\n'.format(_id, pre))

@@ -8,7 +8,9 @@ __pycache__/
 data/char2vec_300
 data/data.pkl
 data/vocab.pkl
+data/expend_atec_nlp.csv
 logdir/checkpoints/*
+logdir/checkpoints-match_pyramid/*
 logdir/model/*
 # Distribution / packaging
 .Python

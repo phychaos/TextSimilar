@@ -12,6 +12,7 @@ class Vocab(object):
 	def __init__(self):
 		self.word2vec = []
 		self.word2idx = {'<PAD>': 0, '<UNK>': 1}
+		self.max_len = 0
 	
 	def add_word(self, word, vector):
 		self.word2idx[word] = len(self.word2idx)

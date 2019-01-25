@@ -6,6 +6,12 @@
 # @time: 18-6-27下午6:13
 import csv
 import pickle
+try:
+	import sys
+	reload(sys)
+	sys.setdefaultencoding('utf8')
+except:
+	pass
 
 
 def read_csv(filename, delimiter='\t'):
@@ -15,9 +21,9 @@ def read_csv(filename, delimiter='\t'):
 	:param delimiter:
 	:return:
 	"""
-	with open(filename, 'r') as fp:
+	import codecs
+	with codecs.open(filename, 'r', encoding='utf-8') as fp:
 		data = [[ii for ii in each] for each in csv.reader(fp, delimiter=delimiter)]
-	print(data[:10])
 	return data
 
 
@@ -49,4 +55,3 @@ def load_data(filename):
 def save_data(filename, data):
 	with open(filename, 'wb') as fp:
 		pickle.dump(data, fp)
-
