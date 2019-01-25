@@ -11,6 +11,7 @@ data/vocab.pkl
 data/expend_atec_nlp.csv
 logdir/checkpoints/*
 logdir/checkpoints-match_pyramid/*
+logdir/checkpoints-rnn/*
 logdir/model/*
 # Distribution / packaging
 .Python
