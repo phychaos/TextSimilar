@@ -34,31 +34,35 @@ class MatchPyramidNetwork(object):
 		pyramid
 		:return:
 		"""
-		x = tf.concat([self.left_x, self.right_x], axis=0)
-		seq_lens = tf.concat([self.left_seq_lens, self.right_seq_lens], axis=0)
-		embed = embedding(x, vocab_size=self.vocab_size, num_units=self.embedding_size, scale=True, scope="embed")
-		dot_output = self.match_text(embed)
-		
-		outputs = tf.expand_dims(dot_output, axis=-1)
+		left_embed = embedding(self.left_x, vocab_size=self.vocab_size, num_units=self.embedding_size, scale=True,
+							   scope="left_embed")
+		right_embed = embedding(self.right_x, vocab_size=self.vocab_size, num_units=self.embedding_size, scale=True,
+								scope="right_embed")
+		outputs = self.match_text(left_embed, right_embed)
 		outputs = self.cnn_layer(outputs, 1)
 		outputs = self.cnn_layer(outputs, 2)
-		# outputs, pre_y = self.multi_dense_layer(outputs)
 		return outputs
 	
 	@staticmethod
-	def match_text(embed):
+	def match_text(left_embed, right_embed):
 		"""
 		文本匹配 cosine dot binary
-		:param embed: 词嵌入 2batch * T * D
+		:param left_embed: 词嵌入 batch * T * D
+		:param right_embed: 词嵌入 batch * T * D
 		:return:
 		"""
-		left_embed, right_embed = tf.split(embed, 2, axis=0)
-		dot_output = tf.matmul(left_embed, tf.transpose(right_embed, [0, 2, 1]))  # batch * T * T
-		# left_norm = tf.sqrt(tf.matmul(left_embed, tf.transpose(left_embed, [0, 2, 1])))
-		# right_norm = tf.sqrt(tf.matmul(right_embed, tf.transpose(right_embed, [0, 2, 1])))
-		# cosine_outputs = tf.div(dot_output, left_norm * right_norm)
-		# binary_outputs = tf.cast(tf.equal(cosine_outputs, 1), tf.float32)
-		
+		with tf.variable_scope("match-text"):
+			dot_output = tf.matmul(left_embed, tf.transpose(right_embed, [0, 2, 1]))  # batch * T * T
+			left_norm = tf.sqrt(tf.matmul(left_embed, tf.transpose(left_embed, [0, 2, 1]))+hp.eps)
+			right_norm = tf.sqrt(tf.matmul(right_embed, tf.transpose(right_embed, [0, 2, 1]))+hp.eps)
+			cosine_outputs = tf.div(dot_output, left_norm * right_norm)
+			binary_outputs = tf.cast(tf.equal(cosine_outputs, 1), tf.float32)
+			dot_output = tf.expand_dims(dot_output, axis=-1)
+			cosine_outputs = tf.expand_dims(cosine_outputs, axis=-1)
+			binary_outputs = tf.expand_dims(binary_outputs, axis=-1)
+			
+			outputs = tf.concat([dot_output, cosine_outputs, binary_outputs], axis=-1)
+		print(outputs.get_shape().as_list())
 		return dot_output
 	
 	@staticmethod
@@ -79,7 +83,6 @@ class MatchPyramidNetwork(object):
 				output = tf.nn.relu(tf.nn.bias_add(output, bias, data_format="NHWC"))
 				pool = tf.nn.max_pool(output, ksize=[1, hp.pool_size, hp.pool_size, 1], strides=[1, 1, 1, 1],
 									  padding='VALID')
-				print(pool.get_shape().as_list())
 				outputs.append(pool)
 		outputs = tf.concat(outputs, axis=-1)
 		return outputs
@@ -190,22 +193,6 @@ class MatchPyramidNetwork(object):
 			output = tf.reduce_sum(attention * query, axis=1)
 			output = layer_normalize(output)
 			return output
-	
-	@staticmethod
-	def similar(key, value):
-		"""
-		cosine(key,value) = key * value/(|key|*|value|)
-		:param key:
-		:param value:
-		:return:
-		"""
-		dot_value = tf.reduce_sum(key * value, axis=-1)
-		key_sqrt = tf.sqrt(tf.reduce_sum(tf.square(key), axis=-1) + hp.eps)
-		value_sqrt = tf.sqrt(tf.reduce_sum(tf.square(value), axis=-1) + hp.eps)
-		distance = tf.div(dot_value, key_sqrt * value_sqrt, name="similar")
-		pre_y = tf.sign(tf.nn.relu(distance - hp.margin))
-		pre_y = tf.cast(pre_y, tf.int32, name='pre')
-		return distance, pre_y
 	
 	def predict(self):
 		correct_predictions = tf.equal(self.pre_y, self.y)

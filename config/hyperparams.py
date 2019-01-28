@@ -85,7 +85,7 @@ class MatchPyramidParams:
 	eps = 1e-9
 	margin = 0.3
 	channel = 64  # 通道数
-	kernel = [2, 3, 4, 5]  # 核大小
+	kernel = [3, 5]  # 核大小
 	pool_size = 2  # 池化层大小
-	dense_size = 100  # 池化层大小
+	dense_size = 100  # 全连接层大小
 	sinusoid = False  # If True, use sinusoid. If false, positional embedding.

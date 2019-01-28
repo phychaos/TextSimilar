@@ -36,4 +36,4 @@ def test(filename=TEST_DATA, outfile=TEST_RESULT, network='rnn'):
 
 
 if __name__ == "__main__":
-	test(sys.argv[1], sys.argv[2])
+	test(sys.argv[1], sys.argv[2], 'rnn')

@@ -5,9 +5,14 @@
 # @file: utils.py
 # @time: 18-6-27下午6:13
 import csv
-import pickle
+
+try:
+	import cPickle as pickle
+except:
+	import pickle
 try:
 	import sys
+	
 	reload(sys)
 	sys.setdefaultencoding('utf8')
 except:
@@ -47,8 +52,12 @@ def load_data(filename):
 	加载词汇信息
 	:return:
 	"""
-	with open(filename, 'rb') as fp:
-		data = pickle.load(fp)
+	try:
+		with open(filename, 'rb') as fp:
+			data = pickle.load(fp)
+	except:
+		with open('data/vocab2.pkl', 'rb') as fp:
+			data = pickle.load(fp)
 	return data
 
 

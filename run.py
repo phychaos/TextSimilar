@@ -38,11 +38,8 @@ def run(network='rnn'):
 			
 			for feed_dict, _ in get_feed_dict(model, train_l_x, train_r_x, train_l_len, train_r_len, train_y,
 											  batch_size):
-				loss, _, acc, gs = sess.run([model.loss, model.train_op, model.acc, model.global_step],
-											feed_dict=feed_dict)
+				loss, _= sess.run([model.loss, model.train_op], feed_dict=feed_dict)
 				train_loss.append(loss)
-				if gs % 1000 == 0:
-					print("epoch\t{}\tstep\t{}\tacc\t{}\tloss\t{}\t".format(epoch, gs, acc, round(loss, 4)))
 			dev_loss = []
 			predicts = []
 			for feed_dict, start in get_feed_dict(model, val_l_x, val_r_x, val_l_len, val_r_len, val_y, batch_size):
@@ -53,6 +50,6 @@ def run(network='rnn'):
 
 
 if __name__ == "__main__":
-	# preprocessor(True)
-	network = 'match_pyramid'  # network = [rnn match_pyramid cnn]
+	preprocessor(True)
+	network = 'match_pyramid'# network = [rnn match_pyramid cnn]
 	run(network)
