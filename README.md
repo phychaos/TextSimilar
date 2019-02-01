@@ -29,9 +29,3 @@ if __name__ == "__main__":
 	network = 'rnn'  # network = [rnn match_pyramid cnn]
 	run(network)
 ```
----
-#### siamese 结果
->| network   |  f1    |  
->|-----------|--------|  
->| word-GRU  | 0.5116 |  
->| char-GRU  | 0.4734 |  
