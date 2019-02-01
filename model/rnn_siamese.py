@@ -4,7 +4,7 @@
 # @Author  : 林利芳
 # @File    : rnn_siamese.py
 import tensorflow as tf
-from config.hyperparams import RNNParams as hp
+from config.hyperparams import RnnParams as hp
 from model.module.modules import embedding, positional_encoding, multihead_attention, feedforward, layer_normalize
 
 

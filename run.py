@@ -9,6 +9,8 @@ from config.config import checkpoint_dir, VOCAB_PKL
 from core.utils import load_data
 from model.rnn_siamese import RnnSiameseNetwork
 from model.match_pyramid import MatchPyramidNetwork
+from model.cnn_siamese import CnnSiameseNetwork
+from model.transformer_siamese import TransformerSiameseNetwork
 from config.hyperparams import HyperParams as hp
 import tensorflow as tf
 
@@ -26,6 +28,10 @@ def run(network='rnn'):
 		model = RnnSiameseNetwork(vocab_size, hp.embedding_size, vocab.max_len, batch_size, True)
 	elif network == 'match_pyramid':
 		model = MatchPyramidNetwork(vocab_size, hp.embedding_size, vocab.max_len, batch_size, True)
+	elif network == 'cnn':
+		model = CnnSiameseNetwork(vocab_size, hp.embedding_size, vocab.max_len, batch_size, True)
+	elif network == "transformer":
+		model = TransformerSiameseNetwork(vocab_size, hp.embedding_size, vocab.max_len, batch_size, True)
 	else:
 		return
 	sv = tf.train.Supervisor(graph=model.graph, logdir=checkpoint_file, save_model_secs=150)
@@ -38,7 +44,7 @@ def run(network='rnn'):
 			
 			for feed_dict, _ in get_feed_dict(model, train_l_x, train_r_x, train_l_len, train_r_len, train_y,
 											  batch_size):
-				loss, _= sess.run([model.loss, model.train_op], feed_dict=feed_dict)
+				loss, _ = sess.run([model.loss, model.train_op], feed_dict=feed_dict)
 				train_loss.append(loss)
 			dev_loss = []
 			predicts = []
@@ -47,9 +53,9 @@ def run(network='rnn'):
 				dev_loss.append(loss)
 				predicts.extend(pre_y[start:])
 			print_info(epoch, gs, train_loss, dev_loss, val_y, predicts)
-
+	
 
 if __name__ == "__main__":
-	preprocessor(True)
-	network = 'match_pyramid'# network = [rnn match_pyramid cnn]
+	# preprocessor(True)
+	network = 'transformer'  # network = [rnn match_pyramid cnn transformer]
 	run(network)

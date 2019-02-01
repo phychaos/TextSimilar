@@ -235,11 +235,11 @@ def feedforward(inputs, num_units=[2048, 512], scope="multihead_attention", reus
     with tf.variable_scope(scope, reuse=reuse):
         # Inner layer
         params = {"inputs": inputs, "filters": num_units[0], "kernel_size": 1, "activation": tf.nn.relu,
-                  "use_bias": True}
+                  "use_bias": True,"reuse":False}
         outputs = tf.layers.conv1d(**params)
 
         # Readout layer
-        params = {"inputs": outputs, "filters": num_units[1], "kernel_size": 1, "activation": None, "use_bias": True}
+        params = {"inputs": outputs, "filters": num_units[1], "kernel_size": 1, "activation": None, "use_bias": True,"reuse":False}
         outputs = tf.layers.conv1d(**params)
 
         # Residual connection

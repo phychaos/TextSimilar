@@ -1,15 +1,15 @@
 #!/usr/bin python3
 # -*- coding: utf-8 -*-
-# @Time    : 19-1-22 上午10:48
+# @Time    : 18-12-29 下午3:07
 # @Author  : 林利芳
-# @File    : transformer_siamese.py
+# @File    : rnn_siamese.py
 import tensorflow as tf
-from config.hyperparams import HyperParams as hp
+from config.hyperparams import CnnParams as hp
 from model.module.modules import embedding, positional_encoding, multihead_attention, feedforward, layer_normalize
 
 
-class TransformerSiameseNetwork(object):
-	def __init__(self, vocab_size, embedding_size, max_len, batch_size, is_training=True, seg='LSTM'):
+class CnnSiameseNetwork(object):
+	def __init__(self, vocab_size, embedding_size, max_len, batch_size, is_training=True):
 		self.vocab_size = vocab_size
 		self.embedding_size = embedding_size
 		self.max_len = max_len
@@ -23,33 +23,32 @@ class TransformerSiameseNetwork(object):
 			self.right_seq_lens = tf.placeholder(dtype=tf.int32, shape=[batch_size])
 			self.global_step = tf.train.create_global_step()
 			
-			query, key = self.siamese(seg)
-			self.distance, self.pre_y = self.similar(query, key)
+			key, value = self.siamese()
+			self.distance, self.pre_y = self.similar(key, value)
 			self.accuracy = self.predict()
 			self.loss = self.loss_layer()
 			self.train_op = self.optimize()
 	
-	def siamese(self, seg):
+	def siamese(self):
 		"""
 		孪生网络 transformer + rnn
-		:param seg:
 		:return:
 		"""
 		x = tf.concat([self.left_x, self.right_x], axis=0)
 		seq_lens = tf.concat([self.left_seq_lens, self.right_seq_lens], axis=0)
 		# layers embedding multi_head_attention rnn
-		left_embed = embedding(self.left_x, vocab_size=self.vocab_size, num_units=hp.num_units, scale=True,
-							   scope="lembed")
-		right_embed = embedding(self.right_x, vocab_size=self.vocab_size, num_units=hp.num_units, scale=True,
-								scope="rembed")
+		embed = embedding(x, vocab_size=self.vocab_size, num_units=self.embedding_size, scale=True, scope="embed")
 		
-		query, key = self.transformer(left_embed, right_embed)
-		# output = self.rnn_layer(embed, seq_lens, seg)
-		query = self.attention(query, query)
-		key = self.attention(key, key)
-		return query, key
+		# output = self.transformer(embed, x)
+		inputs = tf.expand_dims(embed, -1)
+		output = self.cnn_layer(inputs, 1)
+		output = tf.expand_dims(output, -1)
+		output = self.cnn_layer(output, 2)
+		output = self.attention(embed, output)
+		key, value = tf.split(output, 2, axis=0)
+		return key, value
 	
-	def rnn_layer(self, inputs, seq_lens, seg):
+	def rnn_layer(self, inputs, seq_lens, seg=hp.seg):
 		"""
 		创建双向RNN层
 		:param inputs:
@@ -74,40 +73,52 @@ class TransformerSiameseNetwork(object):
 		output = tf.add(fw_output, bw_output)
 		return output
 	
-	def transformer(self, query, key):
+	def cnn_layer(self, inputs, layer=1):
+		"""
+		卷积层 卷积核2,3,4,5 激活层relu 池化层 size=2
+		:param inputs: batch T * T
+		:param layer: batch T * T
+		:return:
+		"""
+		outputs = []
+		d_dim, channel = inputs.get_shape().as_list()[-2:]
+		for ii, width in enumerate(hp.kernel):
+			with tf.variable_scope("cnn_{}_{}_layer".format(layer, ii + 1)):
+				weight = tf.Variable(tf.truncated_normal([width, d_dim, channel, hp.channel], stddev=0.1, name='w'))
+				bias = tf.get_variable('bias', [hp.channel], initializer=tf.constant_initializer(0.0))
+				output = tf.nn.conv2d(inputs, weight, strides=[1, 1, d_dim, 1], padding='SAME')  # batch T T channel
+				output = tf.nn.relu(tf.nn.bias_add(output, bias, data_format="NHWC"))
+				
+				output = tf.reshape(output, shape=[-1, self.max_len, hp.channel])
+				outputs.append(output)
+		outputs = tf.concat(outputs, axis=-1)
+		return outputs
+	
+	def transformer(self, embed, value):
 		with tf.variable_scope("Transformer_Encoder"):
 			# Positional Encoding
-			query += positional_encoding(self.left_x, num_units=hp.num_units, zero_pad=False, scale=False)
-			key += positional_encoding(self.right_x, num_units=hp.num_units, zero_pad=False, scale=False)
+			embed += positional_encoding(value, num_units=hp.num_units, zero_pad=False, scale=False, scope="post")
 			# Dropout
-			output = self.multi_head_block(query, key)
+			output = self.multi_head_block(embed)
 			return output
 	
-	def multi_head_block(self, query, key, causality=False):
+	def multi_head_block(self, query, causality=False):
 		"""
 		多头注意力机制
 		:param query:
-		:param key:
 		:param causality:
 		:return:
 		"""
 		for i in range(hp.num_blocks):
 			with tf.variable_scope("num_blocks_{}".format(i)):
 				# multi head Attention ( self-attention)
-				query = self.multihead_attention(query, query, name="query_attention", causality=causality)
-				key = self.multihead_attention(key, key, name="key_attention", causality=causality)
-				query = self.multihead_attention(query, key, name="query_key_attention")
-				key = self.multihead_attention(key, query, name="query_key_attention")
-		return query, key
-	
-	def multihead_attention(self, query, key, name="key_attention", causality=False):
-		value = multihead_attention(
-			queries=query, keys=key, num_units=hp.num_units, num_heads=hp.num_heads,
-			dropout_rate=hp.dropout_rate, is_training=self.is_training, causality=causality,
-			scope=name)
-		# Feed Forward
-		value = feedforward(value, num_units=[4 * hp.num_units, hp.num_units])
-		return value
+				query = multihead_attention(
+					queries=query, keys=query, num_units=hp.num_units, num_heads=hp.num_heads,
+					dropout_rate=hp.dropout_rate, is_training=self.is_training, causality=causality,
+					scope="self_attention")
+				# Feed Forward
+				query = feedforward(query, num_units=[4 * hp.num_units, hp.num_units])
+		return query
 	
 	def loss_layer(self):
 		"""
@@ -129,6 +140,8 @@ class TransformerSiameseNetwork(object):
 		:param query:
 		:return:
 		"""
+		output = tf.reduce_mean(query, axis=1)
+		return output
 		with tf.name_scope("attention"):
 			w = tf.get_variable(name="attention_w", shape=[2 * hp.num_units, hp.attention_size], dtype=tf.float32)
 			b = tf.get_variable(name="attention_b", shape=[hp.attention_size], dtype=tf.float32)
@@ -145,17 +158,17 @@ class TransformerSiameseNetwork(object):
 			return output
 	
 	@staticmethod
-	def similar(query, key):
+	def similar(key, value):
 		"""
 		cosine(key,value) = key * value/(|key|*|value|)
 		:param key:
 		:param value:
 		:return:
 		"""
-		dot_value = tf.reduce_sum(query * key, axis=-1)
-		query_sqrt = tf.sqrt(tf.reduce_sum(tf.square(query), axis=-1) + hp.eps)
+		dot_value = tf.reduce_sum(key * value, axis=-1)
 		key_sqrt = tf.sqrt(tf.reduce_sum(tf.square(key), axis=-1) + hp.eps)
-		distance = tf.div(dot_value, key_sqrt * query_sqrt, name="similar")
+		value_sqrt = tf.sqrt(tf.reduce_sum(tf.square(value), axis=-1) + hp.eps)
+		distance = tf.div(dot_value, key_sqrt * value_sqrt, name="similar")
 		pre_y = tf.sign(tf.nn.relu(distance - hp.margin))
 		pre_y = tf.cast(pre_y, tf.int32, name='pre')
 		return distance, pre_y

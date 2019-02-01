@@ -7,7 +7,8 @@ import pprint
 
 from sklearn.model_selection import train_test_split
 import numpy as np
-from config.config import DATA_PKL, VOCAB_PKL, ATEC_NLP_DATA, ADD_ATEC_NLP_DATA, CORPUS_DATA, EXPEND_ATEC_NLP_DATA
+from config.config import DATA_PKL, VOCAB_PKL, ATEC_NLP_DATA, ADD_ATEC_NLP_DATA, CORPUS_DATA, EXPEND_ATEC_NLP_DATA, \
+	WordChar
 from core.utils import save_data, read_csv, load_data
 from core.word_embedding import Vocab
 import re
@@ -52,7 +53,9 @@ def extended_corpus(data, is_training=True, filename="train"):
 		similar_data.extend(data)
 	
 	save_expend_data(similar_data, EXPEND_ATEC_NLP_DATA.format(filename))
-	return similar_data
+
+
+# return similar_data
 
 
 def save_expend_data(data, filename):
@@ -144,7 +147,7 @@ def build_vocab(text, max_len):
 	for sentence in text:
 		vocab.extend(sentence)
 	count = collections.Counter(vocab).most_common()
-	vocab = {v: k + 2 for k, (v, _) in enumerate(count[:hp.vocab_size])}
+	vocab = {v: k + 2 for k, (v, _) in enumerate(count)}
 	vocab[PAD] = PAD2ID
 	vocab[UNK] = UNK2ID
 	
@@ -175,21 +178,21 @@ def preprocessor(synonym=False):
 		data.extend(read_csv(ADD_ATEC_NLP_DATA))
 		init_num = len(data)
 		train_data, dev_data = train_test_split(data, test_size=0.1, random_state=50)
-		train_data = extended_corpus(train_data)
-		dev_data = extended_corpus(dev_data, False, 'dev')
-		expand_num = len(train_data) + len(dev_data)
-		print("初始语料\t{}\t扩展语料\t{}\t新增语料\t{}".format(init_num, expand_num, expand_num - init_num))
-	else:
-		train_data = read_csv(EXPEND_ATEC_NLP_DATA.format('train'))
-		dev_data = read_csv(EXPEND_ATEC_NLP_DATA.format('dev'))
+		extended_corpus(train_data)
+		extended_corpus(dev_data, False, 'dev')
+	# expand_num = len(train_data) + len(dev_data)
+	# print("初始语料\t{}\t扩展语料\t{}\t新增语料\t{}".format(init_num, expand_num, expand_num - init_num))
+	# else:
+	train_data = read_csv(EXPEND_ATEC_NLP_DATA.format('train'))
+	dev_data = read_csv(EXPEND_ATEC_NLP_DATA.format('dev'))
 	train_idx, train_left_x, train_right_x, train_y = zip(*train_data)
 	dev_idx, dev_left_x, dev_right_x, dev_y = zip(*dev_data)
 	
-	train_left_x = [kk.split(' ') for kk in train_left_x]
+	train_left_x = split_data(train_left_x)
 	
-	train_right_x = [kk.split(' ') for kk in train_right_x]
-	dev_left_x = [kk.split(' ') for kk in dev_left_x]
-	dev_right_x = [kk.split(' ') for kk in dev_right_x]
+	train_right_x = split_data(train_right_x)
+	dev_left_x = split_data(dev_left_x)
+	dev_right_x = split_data(dev_right_x)
 	train_y = process_label(train_y)
 	dev_y = process_label(dev_y)
 	max_len = max(len(kk) for kk in train_left_x + train_right_x + dev_right_x + dev_left_x)
@@ -217,6 +220,20 @@ def preprocessor(synonym=False):
 	save_data(DATA_PKL, data)
 	save_data(VOCAB_PKL, vocab)
 	return data, vocab
+
+
+def split_data(data):
+	result = []
+	if WordChar == 'char':
+		for sentence in data:
+			sentence = sentence.replace(' ', '')
+			new_sentence = [char for char in sentence]
+			result.append(new_sentence)
+	else:
+		for sentence in data:
+			sentence = sentence.split(' ')
+			result.append(sentence)
+	return result
 
 
 def pad_sequence(data, vocab, max_len):

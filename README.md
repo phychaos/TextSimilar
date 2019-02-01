@@ -5,6 +5,10 @@
 loss函数  
 <img src="logdir/graph/siamese.png">  
 ---
+### match pyramid
+[Text Matching as Image Recognition](https://arxiv.org/abs/1602.06359)    
+<img src="logdir/graph/match_pyramid">  
+---
 数据来源于[蚂蚁金融NLP之问题相似度计算](https://dc.cloud.alipay.com/index#/topic/intro?id=8)  
 >问题相似度计算，即给定客服里用户描述的两句话，用算法来判断是否表示了相同的语义。
 >

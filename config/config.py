@@ -24,3 +24,5 @@ WORD2VEC_DATA = os.path.join(PATH, 'data/char2vec_300')
 logdir = os.path.join(PATH, 'logdir')
 checkpoint_dir = "logdir/checkpoints-{}"
 model_dir = os.path.join(logdir, "model")
+
+WordChar = "char"
